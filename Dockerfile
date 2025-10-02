@@ -1,42 +1,35 @@
-# Build and run:
-#   docker build -t clion/ubuntu/cpp-env:1.0 -f Dockerfile.cpp-env-ubuntu .
-
 FROM ubuntu:24.04
 
-ENV DEBIAN_FRONTEND=noninteractive
+ENV DEBIAN_FRONTEND=noninteractive \
+    MUJOCO_VERSION=3.3.5 \
+    MUJOCO_PREFIX=/opt/mujoco
 
-# Install minimal prerequisites first from default mirrors
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates tzdata && rm -rf /var/lib/apt/lists/*
-
-# Ensure default Ubuntu ports mirrors are configured (arm64)
-RUN rm -f /etc/apt/sources.list.d/* \
-  && codename=$(awk -F= '/^VERSION_CODENAME=/{print $2}' /etc/os-release) \
-  && printf "deb http://us.ports.ubuntu.com/ubuntu-ports %s main restricted universe multiverse\n" "$codename" > /etc/apt/sources.list \
-  && printf "deb http://us.ports.ubuntu.com/ubuntu-ports %s-updates main restricted universe multiverse\n" "$codename" >> /etc/apt/sources.list \
-  && printf "deb http://us.ports.ubuntu.com/ubuntu-ports %s-security main restricted universe multiverse\n" "$codename" >> /etc/apt/sources.list \
-  && printf "deb http://us.ports.ubuntu.com/ubuntu-ports %s-backports main restricted universe multiverse\n" "$codename" >> /etc/apt/sources.list \
-  && printf "Acquire::Retries \"5\"; Acquire::http::Pipeline-Depth \"0\"; Acquire::http::No-Cache \"true\"; Acquire::https::No-Cache \"true\"; Acquire::By-Hash \"yes\";" > /etc/apt/apt.conf.d/99network
-
+# Base toolchain
 RUN apt-get update \
-  && apt-get install -y build-essential \
-  gcc \
-  g++ \
-  gdb \
-  clang \
-  make \
-  ninja-build \
-  cmake \
-  autoconf \
-  automake \
-  libtool \
-  valgrind \
-  locales-all \
-  dos2unix \
-  rsync \
-  tar \
-  python3 \
-  python3-dev \
-  python3-pip \
-  python-is-python3 \
-  && apt-get clean \
-  && rm -rf /var/lib/apt/lists/*
+    && apt-get install -y --no-install-recommends \
+    ca-certificates tzdata wget git \
+    build-essential clang gdb make ninja-build cmake \
+    python3 python3-pip python-is-python3 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Runtime deps for MuJoCo + offscreen rendering
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+    libgl1-mesa-dev \
+    libosmesa6 libosmesa6-dev \
+    libx11-dev libxrandr-dev libxi-dev libxinerama-dev libxcursor-dev libxxf86vm-dev \
+    ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install MuJoCo prebuilt binaries (Linux AArch64)
+RUN wget -q https://github.com/google-deepmind/mujoco/releases/download/${MUJOCO_VERSION}/mujoco-${MUJOCO_VERSION}-linux-aarch64.tar.gz -O /tmp/mujoco.tar.gz \
+    && mkdir -p ${MUJOCO_PREFIX} \
+    && tar -xzf /tmp/mujoco.tar.gz -C ${MUJOCO_PREFIX} --strip-components=1 \
+    && rm -f /tmp/mujoco.tar.gz \
+    && cp -r ${MUJOCO_PREFIX}/include/mujoco /usr/local/include/ \
+    && cp -P ${MUJOCO_PREFIX}/lib/*.so* /usr/local/lib/ \
+    && echo "/usr/local/lib" > /etc/ld.so.conf.d/usr-local.conf \
+    && ldconfig \
+    && test -f /usr/local/lib/libmujoco.so
+
+WORKDIR /work
