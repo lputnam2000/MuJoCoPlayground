@@ -29,8 +29,8 @@ int main(int argc, char **argv)
     // Prefer OSMesa backend for headless rendering
     putenv(const_cast<char *>("MUJOCO_GL=osmesa"));
 
-    // Load model: argv[1] or default to Unitree G1 from menagerie
-    const char *model_path = argc > 1 ? argv[1] : "models/menagerie/unitree_g1/unitree_g1.xml";
+    // Load model: argv[1] or default to Unitree G1 scene from menagerie
+    const char *model_path = argc > 1 ? argv[1] : "models/menagerie/unitree_g1/scene.xml";
     char error[1024] = {0};
     mjModel *m = mj_loadXML(model_path, nullptr, error, sizeof(error));
     if (!m)

@@ -5,7 +5,7 @@ ROOT_DIR=$(cd "$(dirname "$0")/.." && pwd)
 ARG_MODEL=${1:-g1}
 if [ "$ARG_MODEL" = "g1" ]; then
   "$ROOT_DIR/scripts/fetch_menagerie_g1.sh"
-  ARG_MODEL="models/menagerie/unitree_g1/unitree_g1.xml"
+  ARG_MODEL="models/menagerie/unitree_g1/scene.xml"
 fi
 
 # Clean stale CMake cache/toolchain from previous runs
