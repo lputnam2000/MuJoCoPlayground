@@ -1,43 +1,38 @@
 #include <mujoco/mujoco.h>
 #include <cstdio>
 #include <cstdlib>
-#include <cstring>
 #include <vector>
 #include <string>
+#include <cmath>
 #include <GL/osmesa.h>
 
-int main(int, char **)
+static int find_actuator_id(const mjModel *m, const char *name)
+{
+    if (!name)
+        return -1;
+    int id = mj_name2id(m, mjOBJ_ACTUATOR, name);
+    return id;
+}
+
+static int find_joint_dofadr(const mjModel *m, const char *name)
+{
+    if (!name)
+        return -1;
+    int jnt_id = mj_name2id(m, mjOBJ_JOINT, name);
+    if (jnt_id < 0)
+        return -1;
+    return m->jnt_dofadr[jnt_id];
+}
+
+int main(int argc, char **argv)
 {
     // Prefer OSMesa backend for headless rendering
     putenv(const_cast<char *>("MUJOCO_GL=osmesa"));
 
-    const char *xml = R"(<?xml version='1.0'?>
-<mujoco model='offscreen'>
-  <option timestep='0.005'/>
-  <worldbody>
-    <geom name='ground' type='plane' size='0 0 1' rgba='0.8 0.9 0.8 1'/>
-    <body name='box' pos='0 0 0.3'>
-      <freejoint/>
-      <geom type='box' size='0.05 0.05 0.05' rgba='0.2 0.4 0.9 1'/>
-    </body>
-  </worldbody>
-</mujoco>
-)";
-
-    const char *tmp_path = "/tmp/offscreen.xml";
-    if (FILE *f = std::fopen(tmp_path, "wb"))
-    {
-        std::fwrite(xml, 1, std::strlen(xml), f);
-        std::fclose(f);
-    }
-    else
-    {
-        std::fprintf(stderr, "Failed to write %s\n", tmp_path);
-        return 1;
-    }
-
+    // Load model: argv[1] or default to Unitree G1 from menagerie
+    const char *model_path = argc > 1 ? argv[1] : "models/menagerie/unitree_g1/unitree_g1.xml";
     char error[1024] = {0};
-    mjModel *m = mj_loadXML(tmp_path, nullptr, error, sizeof(error));
+    mjModel *m = mj_loadXML(model_path, nullptr, error, sizeof(error));
     if (!m)
     {
         std::fprintf(stderr, "Model error: %s\n", error);
@@ -101,6 +96,10 @@ int main(int, char **)
     const int steps_per_frame = 10; // adjust motion speed
     const int num_frames = 300;     // ~10 seconds @30fps
 
+    // Simple control: try actuator named "motor"; else apply torque to joint named "hinge"
+    const int motor_id = find_actuator_id(m, "motor");
+    const int hinge_dofadr = find_joint_dofadr(m, "hinge");
+
     // open ffmpeg pipe
     std::string ffmpeg_cmd = "ffmpeg -y -f rawvideo -pixel_format rgb24 -video_size " +
                              std::to_string(width) + "x" + std::to_string(height) +
@@ -118,9 +117,26 @@ int main(int, char **)
 
     for (int frame = 0; frame < num_frames; ++frame)
     {
+        // drive signal (sinusoid)
+        double u = 0.5 * std::sin(2.0 * M_PI * (double)frame / 60.0);
+
         for (int k = 0; k < steps_per_frame; ++k)
         {
+            if (motor_id >= 0)
+            {
+                d->ctrl[motor_id] = (mjtNum)u;
+            }
+            else if (hinge_dofadr >= 0)
+            {
+                // apply torque directly to hinge dof
+                d->qfrc_applied[hinge_dofadr] = (mjtNum)u;
+            }
             mj_step(m, d);
+            // clear applied forces after step if used
+            if (hinge_dofadr >= 0)
+            {
+                d->qfrc_applied[hinge_dofadr] = 0;
+            }
         }
         // update scene and render into offscreen buffer
         mjv_updateScene(m, d, &opt, nullptr, &cam, mjCAT_ALL, &scn);

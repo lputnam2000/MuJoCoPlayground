@@ -1,0 +1,24 @@
+<?xml version='1.0'?>
+<mujoco model="pendulum">
+  <option timestep="0.002" gravity="0 0 -9.81"/>
+  <compiler angle="degree" coordinate="local" inertiafromgeom="true"/>
+
+  <default>
+    <geom rgba="0.8 0.8 0.8 1"/>
+  </default>
+
+  <worldbody>
+    <geom type="plane" size="1 1 0.1" pos="0 0 0" rgba="0.9 0.95 0.9 1"/>
+    <body name="pend" pos="0 0 1.0">
+      <joint name="hinge" type="hinge" axis="0 1 0" limited="true" range="-180 180" damping="0.01"/>
+      <geom type="capsule" fromto="0 0 0  0 0 -0.5" size="0.03" rgba="0.2 0.4 0.9 1"/>
+      <geom type="sphere" pos="0 0 -0.5" size="0.08" density="500" rgba="0.9 0.3 0.3 1"/>
+    </body>
+  </worldbody>
+
+  <actuator>
+    <motor name="motor" joint="hinge" gear="1" ctrlrange="-1 1"/>
+  </actuator>
+</mujoco>
+
+

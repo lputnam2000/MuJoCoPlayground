@@ -23,6 +23,9 @@ CMakeUserPresets.json
 MUJOCO_LOG.TXT
 output.mp4
 
+# Downloaded menagerie models
+models/menagerie/
+
 # OS files
 .DS_Store
 
